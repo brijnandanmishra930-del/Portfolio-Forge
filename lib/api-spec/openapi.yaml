@@ -1,15 +1,20 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Portfolio API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: projects
+    description: Portfolio projects
+  - name: contact
+    description: Contact form
+  - name: stats
+    description: Portfolio statistics
 paths:
   /healthz:
     get:
@@ -24,6 +29,112 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      description: Returns all portfolio projects ordered by display order
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}/view:
+    post:
+      operationId: incrementProjectView
+      tags: [projects]
+      summary: Increment project view count
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: View count incremented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /contact:
+    post:
+      operationId: submitContact
+      tags: [contact]
+      summary: Submit a contact message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitContactBody"
+      responses:
+        "201":
+          description: Message submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactMessage"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get portfolio statistics
+      description: Returns aggregate portfolio statistics
+      responses:
+        "200":
+          description: Portfolio stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +145,100 @@ components:
       required:
         - status
 
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        imageUrl:
+          type: ["string", "null"]
+        githubUrl:
+          type: ["string", "null"]
+        liveUrl:
+          type: ["string", "null"]
+        viewCount:
+          type: integer
+        displayOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - description
+        - tags
+        - imageUrl
+        - githubUrl
+        - liveUrl
+        - viewCount
+        - displayOrder
+        - createdAt
+
+    SubmitContactBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        message:
+          type: string
+          minLength: 1
+      required:
+        - name
+        - email
+        - message
+
+    ContactMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - message
+        - createdAt
+
+    PortfolioStats:
+      type: object
+      properties:
+        totalProjects:
+          type: integer
+        totalViews:
+          type: integer
+        totalMessages:
+          type: integer
+      required:
+        - totalProjects
+        - totalViews
+        - totalMessages
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, FormEvent } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import { 
   Terminal, 
@@ -18,7 +18,8 @@ import {
   Zap,
   Sparkles,
   Server,
-  Database
+  Database,
+  Loader2
 } from "lucide-react";
 import { 
   SiReact, 
@@ -37,6 +38,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useListProjects, useSubmitContact, useGetStats, useIncrementProjectView } from "@workspace/api-client-react";
 
 // --- Hooks ---
 
@@ -103,13 +106,6 @@ const TERMINAL_STEPS = [
   ]},
 ];
 
-const GITHUB_STATS = [
-  { label: "Commits (2024)", value: "1,247", color: "text-primary" },
-  { label: "Pull Requests", value: "382", color: "text-secondary" },
-  { label: "Repos", value: "54", color: "text-primary" },
-  { label: "Stars Earned", value: "2.1k", color: "text-secondary" },
-];
-
 const CODE_ROLES = [
   "Full-Stack Developer",
   "AI Engineer",
@@ -162,46 +158,6 @@ const SKILLS = [
       { name: "AWS", icon: <Server className="w-8 h-8" />, color: "#FF9900" },
       { name: "Git", icon: <SiGit className="w-8 h-8" />, color: "#F05032" },
     ]
-  }
-];
-
-const PROJECTS = [
-  {
-    title: "TaskFlow AI",
-    description: "An intelligent project management tool that automatically categorizes and prioritizes tasks using LLMs.",
-    tags: ["Next.js", "LangChain", "PostgreSQL", "TailwindCSS"],
-    image: "/images/project-1.png",
-    github: "#",
-    live: "#"
-  },
-  {
-    title: "NeuralNote",
-    description: "A note-taking app that synthesizes your thoughts and connects related concepts through a visual knowledge graph.",
-    tags: ["React", "Python", "Neo4j", "TensorFlow"],
-    image: "/images/project-2.png",
-    github: "#",
-    live: "#"
-  },
-  {
-    title: "ShopSense",
-    description: "AI-powered personalized e-commerce storefront that adapts its UI based on real-time user behavior analysis.",
-    tags: ["TypeScript", "Node.js", "Redis", "React"],
-    github: "#",
-    live: "#"
-  },
-  {
-    title: "CodeCanvas",
-    description: "A visual programming environment for designing and deploying serverless functions without writing boilerplate.",
-    tags: ["Next.js", "AWS Lambda", "Zustand"],
-    github: "#",
-    live: "#"
-  },
-  {
-    title: "ChatMesh",
-    description: "Decentralized, encrypted messaging protocol designed for high-latency, low-bandwidth environments.",
-    tags: ["Rust", "WebRTC", "React Native"],
-    github: "#",
-    live: "#"
   }
 ];
 
@@ -550,7 +506,92 @@ function SkillsSection() {
   );
 }
 
+// Extract ProjectCard to use Intersection Observer hook per item
+function ProjectCard({ project, idx }: { project: any; idx: number }) {
+  const incrementView = useIncrementProjectView();
+  const viewedRef = useRef(false);
+
+  const handleViewportEnter = () => {
+    if (!viewedRef.current) {
+      viewedRef.current = true;
+      incrementView.mutate({ id: project.id });
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      onViewportEnter={handleViewportEnter}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.7 }}
+      className={`flex flex-col gap-8 lg:gap-16 ${idx % 2 !== 0 ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center`}
+    >
+      {/* Image/Preview */}
+      <div className="w-full lg:w-3/5 group relative perspective-1000">
+        <motion.div 
+          whileHover={{ rotateX: 2, rotateY: idx % 2 === 0 ? -2 : 2, scale: 1.02 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="relative rounded-2xl overflow-hidden aspect-video border border-white/10 glass-card shadow-2xl"
+          style={{ transformStyle: "preserve-3d" }}
+        >
+          {project.imageUrl ? (
+            <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-background to-muted flex items-center justify-center">
+              <Code2 className="w-24 h-24 text-muted-foreground/30" />
+            </div>
+          )}
+          
+          {/* Overlay on hover */}
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-6 backdrop-blur-sm">
+            {project.githubUrl && (
+              <Button variant="outline" className="border-primary text-primary hover:bg-primary/20 rounded-full h-12 px-6" asChild>
+                <a href={project.githubUrl} target="_blank" rel="noreferrer">
+                  <Github className="mr-2 w-4 h-4" /> Code
+                </a>
+              </Button>
+            )}
+            {project.liveUrl && (
+              <Button className="bg-secondary text-black hover:bg-secondary/90 rounded-full h-12 px-6" asChild>
+                <a href={project.liveUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="mr-2 w-4 h-4" /> Live Demo
+                </a>
+              </Button>
+            )}
+          </div>
+        </motion.div>
+        
+        {/* Decorative elements */}
+        <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-secondary/20 blur-2xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
+      </div>
+      
+      {/* Content */}
+      <div className="w-full lg:w-2/5 space-y-6">
+        <div className="space-y-2">
+          <span className="font-mono text-primary text-sm tracking-wider">0{idx + 1}. PROJECT</span>
+          <h3 className="text-3xl md:text-4xl font-bold">{project.title}</h3>
+        </div>
+        
+        <p className="text-muted-foreground text-lg leading-relaxed glass-card p-6 rounded-xl border border-white/5 relative z-10">
+          {project.description}
+        </p>
+        
+        <ul className="flex flex-wrap gap-2 pt-2">
+          {project.tags && project.tags.map((tag: string) => (
+            <li key={tag} className="text-xs font-mono px-3 py-1 bg-white/5 rounded-full border border-white/10 text-secondary">
+              {tag}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.div>
+  );
+}
+
 function ProjectsSection() {
+  const { data: projects, isLoading } = useListProjects();
+
   return (
     <section id="projects" className="py-24 md:py-32 relative">
       <div className="container px-6">
@@ -560,67 +601,30 @@ function ProjectsSection() {
         />
         
         <div className="space-y-24 md:space-y-32">
-          {PROJECTS.map((project, idx) => (
-            <motion.div 
-              key={project.title}
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.7 }}
-              className={`flex flex-col gap-8 lg:gap-16 ${idx % 2 !== 0 ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center`}
-            >
-              {/* Image/Preview */}
-              <div className="w-full lg:w-3/5 group relative perspective-1000">
-                <motion.div 
-                  whileHover={{ rotateX: 2, rotateY: idx % 2 === 0 ? -2 : 2, scale: 1.02 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  className="relative rounded-2xl overflow-hidden aspect-video border border-white/10 glass-card shadow-2xl"
-                  style={{ transformStyle: "preserve-3d" }}
-                >
-                  {project.image ? (
-                    <img src={project.image} alt={project.title} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-background to-muted flex items-center justify-center">
-                      <Code2 className="w-24 h-24 text-muted-foreground/30" />
-                    </div>
-                  )}
-                  
-                  {/* Overlay on hover */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-6 backdrop-blur-sm">
-                    <Button variant="outline" className="border-primary text-primary hover:bg-primary/20 rounded-full h-12 px-6">
-                      <Github className="mr-2 w-4 h-4" /> Code
-                    </Button>
-                    <Button className="bg-secondary text-black hover:bg-secondary/90 rounded-full h-12 px-6">
-                      <ExternalLink className="mr-2 w-4 h-4" /> Live Demo
-                    </Button>
-                  </div>
-                </motion.div>
-                
-                {/* Decorative elements */}
-                <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-secondary/20 blur-2xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-              </div>
-              
-              {/* Content */}
-              <div className="w-full lg:w-2/5 space-y-6">
-                <div className="space-y-2">
-                  <span className="font-mono text-primary text-sm tracking-wider">0{idx + 1}. PROJECT</span>
-                  <h3 className="text-3xl md:text-4xl font-bold">{project.title}</h3>
+          {isLoading ? (
+            // Skeleton Loader
+            Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className={`flex flex-col gap-8 lg:gap-16 ${idx % 2 !== 0 ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center`}>
+                <div className="w-full lg:w-3/5">
+                  <Skeleton className="w-full aspect-video rounded-2xl bg-white/5" />
                 </div>
-                
-                <p className="text-muted-foreground text-lg leading-relaxed glass-card p-6 rounded-xl border border-white/5 relative z-10">
-                  {project.description}
-                </p>
-                
-                <ul className="flex flex-wrap gap-2 pt-2">
-                  {project.tags.map(tag => (
-                    <li key={tag} className="text-xs font-mono px-3 py-1 bg-white/5 rounded-full border border-white/10 text-secondary">
-                      {tag}
-                    </li>
-                  ))}
-                </ul>
+                <div className="w-full lg:w-2/5 space-y-6">
+                  <Skeleton className="w-24 h-4 bg-white/5" />
+                  <Skeleton className="w-3/4 h-10 bg-white/5" />
+                  <Skeleton className="w-full h-32 bg-white/5 rounded-xl" />
+                  <div className="flex gap-2">
+                    <Skeleton className="w-16 h-6 bg-white/5 rounded-full" />
+                    <Skeleton className="w-20 h-6 bg-white/5 rounded-full" />
+                    <Skeleton className="w-16 h-6 bg-white/5 rounded-full" />
+                  </div>
+                </div>
               </div>
-            </motion.div>
-          ))}
+            ))
+          ) : (
+            projects?.map((project, idx) => (
+              <ProjectCard key={project.id} project={project} idx={idx} />
+            ))
+          )}
         </div>
       </div>
     </section>
@@ -698,6 +702,30 @@ function ExperienceSection() {
 }
 
 function ContactSection() {
+  const submitContact = useSubmitContact();
+  const [formData, setFormData] = useState({ name: "", email: "", message: "" });
+  const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccess(false);
+
+    submitContact.mutate(
+      { data: formData },
+      {
+        onSuccess: () => {
+          setSuccess(true);
+          setFormData({ name: "", email: "", message: "" });
+        },
+        onError: (error) => {
+          setErrorMsg(error.error || "Failed to send message.");
+        }
+      }
+    );
+  };
+
   return (
     <section id="contact" className="py-24 md:py-32 relative overflow-hidden">
       {/* Decorative background */}
@@ -750,24 +778,64 @@ function ContactSection() {
             </div>
             
             <div className="md:col-span-3">
-              <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+              <form className="space-y-6" onSubmit={handleSubmit}>
+                {success && (
+                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400">
+                    Message sent! I'll get back to you soon.
+                  </div>
+                )}
+                {errorMsg && (
+                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
+                    {errorMsg}
+                  </div>
+                )}
                 <div className="grid sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label htmlFor="name" className="text-sm font-mono text-muted-foreground uppercase">Name</label>
-                    <Input id="name" placeholder="John Doe" className="bg-black/50 border-white/10 focus-visible:ring-primary h-12" />
+                    <Input 
+                      id="name" 
+                      placeholder="John Doe" 
+                      className="bg-black/50 border-white/10 focus-visible:ring-primary h-12" 
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="email" className="text-sm font-mono text-muted-foreground uppercase">Email</label>
-                    <Input id="email" type="email" placeholder="john@example.com" className="bg-black/50 border-white/10 focus-visible:ring-primary h-12" />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="john@example.com" 
+                      className="bg-black/50 border-white/10 focus-visible:ring-primary h-12" 
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="message" className="text-sm font-mono text-muted-foreground uppercase">Message</label>
-                  <Textarea id="message" placeholder="Initialize transmission..." className="bg-black/50 border-white/10 focus-visible:ring-primary min-h-[150px] resize-none" />
+                  <Textarea 
+                    id="message" 
+                    placeholder="Initialize transmission..." 
+                    className="bg-black/50 border-white/10 focus-visible:ring-primary min-h-[150px] resize-none" 
+                    value={formData.message}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    required
+                  />
                 </div>
-                <Button type="submit" className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-white rounded-xl group relative overflow-hidden">
+                <Button 
+                  type="submit" 
+                  disabled={submitContact.isPending}
+                  className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-white rounded-xl group relative overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed"
+                >
                   <span className="relative z-10 flex items-center gap-2">
-                    Send Message <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                    {submitContact.isPending ? (
+                      <>Sending... <Loader2 className="w-5 h-5 animate-spin" /></>
+                    ) : (
+                      <>Send Message <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /></>
+                    )}
                   </span>
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
                 </Button>
@@ -801,6 +869,8 @@ function TerminalSection() {
   const [phase, setPhase] = useState<"typing" | "output" | "wait">("wait");
   const [currentStep, setCurrentStep] = useState(0);
   const [started, setStarted] = useState(false);
+
+  const { data: stats, isLoading: statsLoading } = useGetStats();
 
   useEffect(() => {
     if (!started) return;
@@ -836,6 +906,13 @@ function TerminalSection() {
     }
   }, [started, phase, typingIdx, currentStep]);
 
+  const liveStats = [
+    { label: "Commits (2024)", value: "1,247", color: "text-primary" },
+    { label: "Projects", value: stats?.totalProjects?.toString() || "0", color: "text-secondary" },
+    { label: "Total Views", value: stats?.totalViews?.toString() || "0", color: "text-primary" },
+    { label: "Messages Received", value: stats?.totalMessages?.toString() || "0", color: "text-secondary" },
+  ];
+
   return (
     <section className="py-24 md:py-32 bg-black relative overflow-hidden">
       {/* scanline overlay */}
@@ -847,7 +924,7 @@ function TerminalSection() {
         <div className="max-w-3xl mx-auto">
           {/* GitHub-style stat bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-            {GITHUB_STATS.map((stat, i) => (
+            {liveStats.map((stat, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
@@ -856,7 +933,11 @@ function TerminalSection() {
                 transition={{ duration: 0.4, delay: i * 0.1 }}
                 className="bg-[#0d1117] border border-[#30363d] rounded-xl p-4 text-center"
               >
-                <div className={`text-2xl font-black font-mono ${stat.color}`}>{stat.value}</div>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-16 mx-auto mb-1 bg-white/5" />
+                ) : (
+                  <div className={`text-2xl font-black font-mono ${stat.color}`}>{stat.value}</div>
+                )}
                 <div className="text-xs text-[#8b949e] mt-1 font-mono">{stat.label}</div>
               </motion.div>
             ))}

@@ -16,6 +16,14 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Artifacts
+
+### `artifacts/portfolio` (`@workspace/portfolio`)
+React + Vite dark-themed developer portfolio for "Alex Rivera". Single-page scroll with framer-motion animations. Features: animated typewriter hero, interactive terminal section, skills, projects, experience, and contact form. All project and stats data served from the API. Contact form saves messages to DB.
+
+- Preview path: `/`
+- Dev: `pnpm --filter @workspace/portfolio run dev`
+
 ## Structure
 
 ```text
