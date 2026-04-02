@@ -38,7 +38,85 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+// --- Hooks ---
+
+function useTypewriter(strings: string[], speed = 75, pause = 2200) {
+  const [displayed, setDisplayed] = useState("");
+  const [strIdx, setStrIdx] = useState(0);
+  const [charIdx, setCharIdx] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const current = strings[strIdx];
+    let timeout: ReturnType<typeof setTimeout>;
+
+    if (!deleting) {
+      if (charIdx < current.length) {
+        timeout = setTimeout(() => {
+          setDisplayed(current.slice(0, charIdx + 1));
+          setCharIdx(c => c + 1);
+        }, speed);
+      } else {
+        timeout = setTimeout(() => setDeleting(true), pause);
+      }
+    } else {
+      if (charIdx > 0) {
+        timeout = setTimeout(() => {
+          setDisplayed(current.slice(0, charIdx - 1));
+          setCharIdx(c => c - 1);
+        }, speed / 2);
+      } else {
+        setDeleting(false);
+        setStrIdx(i => (i + 1) % strings.length);
+      }
+    }
+
+    return () => clearTimeout(timeout);
+  }, [charIdx, deleting, strIdx, strings, speed, pause]);
+
+  return displayed;
+}
+
 // --- Data ---
+
+const TERMINAL_STEPS = [
+  { cmd: "whoami", delay: 400, output: ["alex-rivera  uid=1337(developer) gid=1337(engineer)"] },
+  { cmd: "cat profile.json", delay: 800, output: [
+    '{',
+    '  "name": "Alex Rivera",',
+    '  "role": "Full-Stack Engineer & AI Builder",',
+    '  "location": "San Francisco, CA",',
+    '  "available": true,',
+    '  "contact": "hello@alexrivera.dev"',
+    '}'
+  ]},
+  { cmd: "ls projects/", delay: 600, output: [
+    "taskflow-ai/   neuralnote/   shopsense/   codecanvas/   chatmesh/"
+  ]},
+  { cmd: "git log --oneline -3", delay: 500, output: [
+    "a1b2c3d  feat: integrate LangChain pipeline for auto-categorization",
+    "9f8e7d6  fix: reduce microservice latency by 40%",
+    "3c4d5e6  chore: add Docker multi-stage build"
+  ]},
+  { cmd: "node -e \"console.log('Available for hire: ' + true)\"", delay: 700, output: [
+    "Available for hire: true"
+  ]},
+];
+
+const GITHUB_STATS = [
+  { label: "Commits (2024)", value: "1,247", color: "text-primary" },
+  { label: "Pull Requests", value: "382", color: "text-secondary" },
+  { label: "Repos", value: "54", color: "text-primary" },
+  { label: "Stars Earned", value: "2.1k", color: "text-secondary" },
+];
+
+const CODE_ROLES = [
+  "Full-Stack Developer",
+  "AI Engineer",
+  "Open Source Contributor",
+  "Hackathon Builder",
+  "System Architect",
+];
 
 const NAV_ITEMS = [
   { label: "About", href: "#about" },
@@ -246,6 +324,7 @@ function HeroSection() {
   const { scrollY } = useScroll();
   const y = useTransform(scrollY, [0, 1000], [0, 300]);
   const opacity = useTransform(scrollY, [0, 500], [1, 0]);
+  const role = useTypewriter(CODE_ROLES, 70, 2000);
 
   return (
     <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
@@ -282,9 +361,15 @@ function HeroSection() {
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <h2 className="text-xl md:text-2xl font-mono text-secondary mb-4">Hello, World. I am</h2>
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-6 tracking-tight leading-none">
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-4 tracking-tight leading-none">
             ALEX RIVERA
           </h1>
+          {/* Typewriter role line */}
+          <div className="flex items-center justify-center gap-2 mb-6 h-8">
+            <span className="text-muted-foreground font-mono text-base md:text-lg">&gt;&nbsp;</span>
+            <span className="font-mono text-base md:text-lg text-secondary">{role}</span>
+            <span className="w-0.5 h-5 bg-secondary animate-pulse" />
+          </div>
         </motion.div>
 
         <motion.div
@@ -709,6 +794,146 @@ function Footer() {
   );
 }
 
+function TerminalSection() {
+  const [visibleSteps, setVisibleSteps] = useState<number[]>([]);
+  const [typing, setTyping] = useState<string>("");
+  const [typingIdx, setTypingIdx] = useState(0);
+  const [phase, setPhase] = useState<"typing" | "output" | "wait">("wait");
+  const [currentStep, setCurrentStep] = useState(0);
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    if (!started) return;
+    if (currentStep >= TERMINAL_STEPS.length) return;
+
+    const step = TERMINAL_STEPS[currentStep];
+
+    if (phase === "wait") {
+      const t = setTimeout(() => setPhase("typing"), step.delay);
+      return () => clearTimeout(t);
+    }
+
+    if (phase === "typing") {
+      if (typingIdx < step.cmd.length) {
+        const t = setTimeout(() => {
+          setTyping(step.cmd.slice(0, typingIdx + 1));
+          setTypingIdx(i => i + 1);
+        }, 55);
+        return () => clearTimeout(t);
+      } else {
+        const t = setTimeout(() => setPhase("output"), 300);
+        return () => clearTimeout(t);
+      }
+    }
+
+    if (phase === "output") {
+      setVisibleSteps(v => [...v, currentStep]);
+      setTyping("");
+      setTypingIdx(0);
+      setPhase("wait");
+      const t = setTimeout(() => setCurrentStep(s => s + 1), 200);
+      return () => clearTimeout(t);
+    }
+  }, [started, phase, typingIdx, currentStep]);
+
+  return (
+    <section className="py-24 md:py-32 bg-black relative overflow-hidden">
+      {/* scanline overlay */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(255,255,255,1)_2px,rgba(255,255,255,1)_4px)]" />
+
+      <div className="container px-6">
+        <SectionHeading title="Terminal" subtitle="// system.shell.interactive" />
+
+        <div className="max-w-3xl mx-auto">
+          {/* GitHub-style stat bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+            {GITHUB_STATS.map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.1 }}
+                className="bg-[#0d1117] border border-[#30363d] rounded-xl p-4 text-center"
+              >
+                <div className={`text-2xl font-black font-mono ${stat.color}`}>{stat.value}</div>
+                <div className="text-xs text-[#8b949e] mt-1 font-mono">{stat.label}</div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Terminal window */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            onViewportEnter={() => setStarted(true)}
+            className="rounded-xl overflow-hidden border border-[#30363d] shadow-2xl shadow-black/60"
+          >
+            {/* Title bar */}
+            <div className="bg-[#161b22] px-4 py-3 flex items-center gap-2 border-b border-[#30363d]">
+              <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
+              <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
+              <div className="w-3 h-3 rounded-full bg-[#28c840]" />
+              <span className="ml-3 text-xs font-mono text-[#8b949e]">bash — alex@portfolio:~</span>
+            </div>
+
+            {/* Terminal body */}
+            <div className="bg-[#0d1117] p-6 min-h-[320px] font-mono text-sm space-y-3 text-[#c9d1d9]">
+              <div className="text-[#8b949e] text-xs mb-4">
+                Last login: {new Date().toDateString()} on ttys001
+              </div>
+
+              {TERMINAL_STEPS.slice(0, currentStep).map((step, i) =>
+                visibleSteps.includes(i) ? (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#58a6ff]">alex</span>
+                      <span className="text-[#8b949e]">@portfolio</span>
+                      <span className="text-[#8b949e]">:</span>
+                      <span className="text-[#7ee787]">~</span>
+                      <span className="text-[#8b949e]">$</span>
+                      <span className="text-[#c9d1d9]">{step.cmd}</span>
+                    </div>
+                    {step.output.map((line, j) => (
+                      <div key={j} className={`pl-4 ${line.startsWith('Available') ? 'text-[#7ee787] font-bold' : 'text-[#8b949e]'}`}>{line}</div>
+                    ))}
+                  </div>
+                ) : null
+              )}
+
+              {/* Currently typing line */}
+              {currentStep < TERMINAL_STEPS.length && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[#58a6ff]">alex</span>
+                  <span className="text-[#8b949e]">@portfolio</span>
+                  <span className="text-[#8b949e]">:</span>
+                  <span className="text-[#7ee787]">~</span>
+                  <span className="text-[#8b949e]">$</span>
+                  <span className="text-[#c9d1d9]">{typing}</span>
+                  <span className="w-2 h-4 bg-[#c9d1d9] animate-pulse" />
+                </div>
+              )}
+
+              {currentStep >= TERMINAL_STEPS.length && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[#58a6ff]">alex</span>
+                  <span className="text-[#8b949e]">@portfolio</span>
+                  <span className="text-[#8b949e]">:</span>
+                  <span className="text-[#7ee787]">~</span>
+                  <span className="text-[#8b949e]">$</span>
+                  <span className="w-2 h-4 bg-[#c9d1d9] animate-pulse" />
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Portfolio() {
   return (
     <div className="bg-background text-foreground min-h-screen selection:bg-primary/30 selection:text-primary">
@@ -716,6 +941,7 @@ export default function Portfolio() {
       <main>
         <HeroSection />
         <AboutSection />
+        <TerminalSection />
         <SkillsSection />
         <ProjectsSection />
         <ExperienceSection />
